@@ -1,0 +1,97 @@
+pipeline{
+
+ agent { label 'built-in' }
+ 
+ environment {
+  IMAGE_NAME = "cloudthree372/insureme-app"
+  TAG = "${BUILD_NUMBER}"
+ }
+
+ tools{
+    maven 'Maven'
+ }
+stages{
+    stage('Checkout code')
+    {
+        agent any
+        steps{
+            git 'https://github.com/HarshaVardhannaidu07/star-agile-insurance-project'
+        }
+    }
+        
+        stage('Package code')
+        {
+            agent any
+            steps{
+                sh 'mvn clean package'
+            }
+        }
+        
+        stage('Build Image')
+        {
+            agent any
+            steps{
+                sh 'docker build -t $IMAGE_NAME:$TAG .'
+            }
+        }
+    
+     stage('Docker Push') {
+   steps {
+    withCredentials([usernamePassword(
+      credentialsId: 'docker-creds',
+      usernameVariable: 'USER',
+      passwordVariable: 'PASS'
+    )]) {
+     sh 'echo $PASS | docker login -u $USER --password-stdin'
+     sh 'docker push $IMAGE_NAME:$TAG'
+    }
+   }
+  }
+   stage('Deploy on Test server')
+  {
+   agent {
+         label 'test-server'
+        }
+   steps{
+            sh 'docker run -d -p 8088:8081 $IMAGE_NAME:$TAG '
+        }
+    }
+    stage('Application Health Check') {
+    steps {
+        sh '''#!/bin/bash
+            # Use -trim to remove any accidental whitespace/line endings
+            TEST_IP=http://13.211.117.112:8088
+
+            echo "Checking application at: $TEST_IP"
+
+            for i in {1..10}; do
+                # Added --connect-timeout to avoid hanging
+                STATUS=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "$TEST_IP")
+                
+                if [ "$STATUS" -eq 200 ]; then
+                    echo "SUCCESS: Application is UP (HTTP 200)"
+                    exit 0
+                fi
+                
+                echo "Attempt $i/10: Received HTTP $STATUS. Retrying in 10s..."
+                sleep 10
+            done
+
+            echo "ERROR: Application failed to start after 100 seconds"
+            exit 1
+        '''
+       }
+    }
+    stage('Deploy Prod') {
+   when {
+    expression { currentBuild.currentResult == "SUCCESS" }
+   }
+   agent {
+            label 'prod-server'
+      }
+   steps{
+         sh 'docker run -d -p 8088:8081 $IMAGE_NAME:$TAG '
+        }
+   }
+ }
+}
