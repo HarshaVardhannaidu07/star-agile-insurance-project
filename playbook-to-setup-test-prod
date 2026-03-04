@@ -1,0 +1,16 @@
+- name: Install and set up test-server and prod-server
+  hosts: test,prod
+  become: true
+  tasks:
+  - name: Update the apt repo
+    command: apt-get update
+  - name: Install multiple packages
+    package: name={{item}} state=present
+    loop:
+     - git
+     - docker.io
+     - openjdk-21-jdk
+  - name: start docker service
+    service: name={{item}} state=started
+    loop:
+    - docker
