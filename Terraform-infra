@@ -1,3 +1,4 @@
+=====================================main.tf===============================================
 resource "tls_private_key" "mykey" {
  algorithm = "RSA"
  rsa_bits  = 4096
@@ -99,4 +100,44 @@ resource "aws_instance" "prod" {
  vpc_security_group_ids = [aws_security_group.sl-sg.id]
 
  tags = { Name = "Project-Prod" }
+}
+==============================================varibles.tf====================================
+variable "region" {
+ default = "ap-southeast-2"
+}
+
+variable "ami" {
+ description = "EC2 AMI"
+}
+
+variable "instance_type" {
+ default = "m7i-flex.large"
+}
+
+variable "vpc_cidr" {
+ default = "10.0.0.0/16"
+}
+
+variable "subnet_cidr" {
+ default = "10.0.1.0/24"
+}
+
+variable "sg_ports" {
+ type    = list(number)
+ default = [8080,80,22,443,8088]
+}
+========================================terraform.tfvars====================================
+ami = "ami-0c73bd9145b5546f5"
+
+=======================================outputs.tf===========================================
+output "test_ip" {
+ value = aws_instance.test.public_ip
+}
+
+output "prod_ip" {
+ value = aws_instance.prod.public_ip
+}
+
+output "ssh_key" {
+ value = local_file.pem_file.filename
 }
